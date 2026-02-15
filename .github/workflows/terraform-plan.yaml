@@ -1,0 +1,46 @@
+name: terraform-plan
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - ".github/workflows/terraform-plan.yml"
+
+permissions:
+  contents: read
+  id-token: write  # required for GitHub OIDC -> AWS role assumption :contentReference[oaicite:3]{index=3}
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ${{ vars.TF_WORKING_DIR }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+      # OIDC usage pattern is documented by the action and GitHub docs :contentReference[oaicite:4]{index=4}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+      # Terraform setup action :contentReference[oaicite:5]{index=5}
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform fmt (check)
+        run: terraform fmt -check -recursive
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Terraform plan
+        run: terraform plan -input=false -no-color

@@ -1,0 +1,11 @@
+{
+  "name": "perf-cost-lab-app",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "ecs/server.js",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.0.0",
+    "@aws-sdk/lib-dynamodb": "^3.0.0",
+    "express": "^4.19.2"
+  }
+}
