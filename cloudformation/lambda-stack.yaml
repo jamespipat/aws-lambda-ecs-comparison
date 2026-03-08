@@ -1,0 +1,183 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Serverless Showdown — Lambda Stack.
+  Deploys DynamoDB, IAM role, Lambda function, and HTTP API.
+
+Resources:
+
+  # ──────────────────────────────────────────────
+  # DynamoDB Table (shared by both Lambda and ECS)
+  # ──────────────────────────────────────────────
+  DynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: lambda-apigateway
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+
+  # ──────────────────────────────────────────────
+  # IAM Role for Lambda (least-privilege)
+  # ──────────────────────────────────────────────
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: lambda-apigateway-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: lambda-apigateway-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: DynamoDBAccess
+                Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Scan
+                  - dynamodb:Query
+                Resource: !GetAtt DynamoDBTable.Arn
+              - Sid: CloudWatchLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+
+  # ──────────────────────────────────────────────
+  # Lambda Function
+  # ──────────────────────────────────────────────
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: LambdaFunctionOverHttps
+      Runtime: python3.13
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      MemorySize: 128
+      Timeout: 30
+      Code:
+        ZipFile: |
+          import boto3
+          import json
+          import time
+
+          print('Loading function')
+
+          def lambda_handler(event, context):
+              """
+              Unified CRUD handler for DynamoDB operations via API Gateway HTTP API.
+              Supports: create, read, update, delete, list, echo, ping
+              """
+              start = time.time()
+
+              # HTTP API (v2.0) sends the body as a JSON string
+              if isinstance(event.get('body'), str):
+                  event = json.loads(event['body'])
+
+              operation = event.get('operation')
+              if not operation:
+                  return {
+                      'statusCode': 400,
+                      'body': json.dumps({'error': 'Missing "operation" field'})
+                  }
+
+              if 'tableName' in event:
+                  dynamo = boto3.resource('dynamodb').Table(event['tableName'])
+
+              operations = {
+                  'create': lambda x: dynamo.put_item(**x),
+                  'read':   lambda x: dynamo.get_item(**x),
+                  'update': lambda x: dynamo.update_item(**x),
+                  'delete': lambda x: dynamo.delete_item(**x),
+                  'list':   lambda x: dynamo.scan(**x),
+                  'echo':   lambda x: x,
+                  'ping':   lambda x: 'pong'
+              }
+
+              if operation not in operations:
+                  return {
+                      'statusCode': 400,
+                      'body': json.dumps({'error': f'Unrecognized operation "{operation}"'})
+                  }
+
+              result = operations[operation](event.get('payload', {}))
+              duration_ms = round((time.time() - start) * 1000, 2)
+
+              print(f'Operation: {operation} | Duration: {duration_ms}ms')
+
+              return {
+                  'statusCode': 200,
+                  'headers': {'Content-Type': 'application/json'},
+                  'body': json.dumps(result, default=str)
+              }
+
+  # ──────────────────────────────────────────────
+  # API Gateway HTTP API
+  # ──────────────────────────────────────────────
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: DynamoDBOperations
+      ProtocolType: HTTP
+      Description: HTTP API for Serverless Showdown — Lambda path
+
+  HttpApiIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt LambdaFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  HttpApiRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: POST /DynamoDBManager
+      Target: !Sub integrations/${HttpApiIntegration}
+
+  HttpApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HttpApi
+      StageName: $default
+      AutoDeploy: true
+
+  # Permission for API Gateway to invoke Lambda
+  LambdaApiGatewayPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*
+
+# ──────────────────────────────────────────────
+# Outputs
+# ──────────────────────────────────────────────
+Outputs:
+  ApiEndpoint:
+    Description: Lambda HTTP API invoke URL
+    Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/DynamoDBManager
+
+  LambdaFunctionArn:
+    Description: Lambda function ARN (needed for Power Tuning)
+    Value: !GetAtt LambdaFunction.Arn
+
+  DynamoDBTableName:
+    Description: DynamoDB table name
+    Value: !Ref DynamoDBTable

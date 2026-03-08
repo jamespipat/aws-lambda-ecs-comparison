@@ -1,32 +1,26 @@
-name: deploy
+name: Push image
 
 on:
   push:
     branches: ["main"]
     paths:
-      - "infra/**"
-      - "app/**"
-      - "scripts/**"
+      - "ecs/**"
       - ".github/workflows/deploy.yml"
 
 permissions:
   contents: read
-  id-token: write  # required for OIDC assume-role :contentReference[oaicite:6]{index=6}
+  id-token: write  # required for OIDC assume-role
 
-concurrency:
-  group: terraform-apply
-  cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  build-and-push:
     runs-on: ubuntu-latest
     environment: prod
 
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
-      TF_WORKING_DIR: ${{ vars.TF_WORKING_DIR }}
       ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
-      IMAGE_TAG: ${{ github.sha }}
+      IMAGE_TAG: latest
 
     steps:
       - name: Checkout
@@ -37,13 +31,11 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
-      # :contentReference[oaicite:7]{index=7}
 
       # ---- Build + push ECS image to ECR ----
       - name: Login to Amazon ECR
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
-      # :contentReference[oaicite:8]{index=8}
 
       - name: Build and push image
         working-directory: app
@@ -55,37 +47,3 @@ jobs:
 
           docker build -t "$IMAGE_URI" .
           docker push "$IMAGE_URI"
-
-      # ---- Build Lambda ZIP and upload as GitHub artifact ----
-      - name: Build Lambda zip
-        run: |
-          set -euo pipefail
-          rm -rf dist && mkdir -p dist
-          pushd app
-          npm ci --omit=dev
-          popd
-          # zip only what Lambda needs
-          zip -r dist/lambda.zip app/src app/lambda app/node_modules app/package.json
-
-      - name: Upload Lambda artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: lambda-zip
-          path: dist/lambda.zip
-          retention-days: 7
-
-      # ---- Terraform apply (uses the new image tag) ----
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-      # :contentReference[oaicite:9]{index=9}
-
-      - name: Terraform init
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform init -input=false
-
-      - name: Terraform apply
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        run: |
-          terraform apply -input=false -auto-approve \
-            -var="aws_region=${AWS_REGION}" \
-            -var="image_tag=${IMAGE_TAG}"
