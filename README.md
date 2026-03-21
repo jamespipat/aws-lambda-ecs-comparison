@@ -17,7 +17,7 @@ serverless-showdown/
 ├── README.md
 ├── LICENSE
 ├── .github/workflows              # Github actions if you want a workflow (which I love)
-│   └── deploy.yaml    
+│   └── push-to-ecr.yaml    
 ├── cloudformation/
 │   ├── lambda-stack.yaml          # DynamoDB + IAM + Lambda + HTTP API
 │   └── ecs-stack.yaml             # ECR + VPC (public/private) + NAT + ALB + ECS Fargate
@@ -83,33 +83,7 @@ Both paths expose the same CRUD operations, `create`, `read`, `update`, `delete`
 
 ### High-Level Diagram
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                          CLIENTS / POSTMAN                          │
-└──────────┬──────────────────────────────────────┬───────────────────┘
-           │                                      │
-           ▼                                      ▼
-┌─────────────────────┐              ┌─────────────────────────┐
-│   API Gateway HTTP  │              │  Application Load       │
-│   (Managed)         │              │  Balancer (ALB)         │
-└────────┬────────────┘              │  ┌─ Public Subnets ──┐  │
-         │                           └──┘                   └──┘
-         ▼                                    │
-┌─────────────────────┐              ┌────────┴────────────────┐
-│   AWS Lambda        │              │  ┌─ Private Subnets ─┐  │
-│   Python 3.13       │              │  │ ECS Fargate Service│  │
-│   (Power Tuned)     │              │  │ Flask Container    │  │
-└────────┬────────────┘              │  │ (2 tasks, 0.5 vCPU)│ │
-         │                           │  └──────┬─────────────┘ │
-         │                           │    NAT Gateway → IGW    │
-         │                           └─────────┬───────────────┘
-         └──────────┬──────────────────────────┘
-                    ▼
-         ┌─────────────────────┐
-         │     DynamoDB        │
-         │  (lambda-apigateway)│
-         └─────────────────────┘
-```
+![High-Level Diagram](images/architecture-flow.gif)
 
 ---
 
