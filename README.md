@@ -17,7 +17,7 @@ serverless-showdown/
 ├── README.md
 ├── LICENSE
 ├── .github/workflows              # Github actions if you want a workflow (which I love)
-│   └── push-to-ecr.yaml    
+│   └── push-to-ecr.yaml
 ├── cloudformation/
 │   ├── lambda-stack.yaml          # DynamoDB + IAM + Lambda + HTTP API
 │   └── ecs-stack.yaml             # ECR + VPC (public/private) + NAT + ALB + ECS Fargate
@@ -56,7 +56,7 @@ Choosing betIen serverless and containers is one of the most common decisions cl
 
 **Everything is provisioned via CloudFormation**, just deploy the stacks and you're ready to test. No clicking around the console. No manual resource wiring.
 
-The goal: data-driven ansIrs instead of opinions.
+The goal: data-driven answers instead of opinions.
 
 ---
 
@@ -235,11 +235,11 @@ The Power Tuning visualization shows a graph plotting **memory size vs. executio
 | 128 | ~2,850 | ~$0.0000060 |
 | 256 | ~2,200 | ~$0.0000070 |
 | 512 | ~1,200 | ~$0.0000040 (best cost) |
-| 1024 | ~1,250 | ~$0.0000044 (sIet spot) |
+| 1024 | ~1,250 | ~$0.0000047 (sweet spot) |
 | 2048 | 172 | $0.0000058 |
 | 3008 | ~150 | ~$0.0000090 (worst cost) |
 
-> 📊 **Finding:** The best cost was **512MB** and the best time was **3008MB**. The massive drop happens betIen 256MB and 512MB, going from ~2,200ms to ~1,200ms. At **1024MB**, latency drops to ~250ms while cost stays nearly flat vs 512MB, that's the sIet spot. Beyond 1024MB, you pay significantly more per invocation for diminishing latency returns (172ms at 2048MB costs ~32% more).
+> 📊 **Finding:** The best cost was **512MB** and the best time was **3008MB**. The massive drop happens between 256MB and 512MB, going from ~2,200ms to ~1,200ms. At **1024MB**, latency drops to ~250ms while cost stays nearly flat vs 512MB, that's the sweet spot. Beyond 1024MB, you pay significantly more per invocation for diminishing latency returns (172ms at 2048MB costs ~32% more).
 
 ### 2.4 Apply the Optimal Configuration
 
