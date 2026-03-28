@@ -38,11 +38,11 @@ serverless-showdown/
 - [Why This Project?](#-why-this-project)
 - [Architecture Overview](#-architecture-overview)
 - [Prerequisites](#-prerequisites)
-- [Part 1, Lambda Serverless API (CloudFormation)](#-part-1--lambda-serverless-api-cloudformation)
-- [Part 2, Lambda Power Tuning](#-part-2--lambda-power-tuning)
-- [Part 3, ECS Fargate API (CloudFormation)](#-part-3--ecs-fargate-api-cloudformation)
-- [Part 4, Performance Testing with Postman](#-part-4--performance-testing-with-postman)
-- [Part 5, Cost Comparison](#-part-5--cost-comparison)
+- [Part 1, Lambda Serverless API (CloudFormation)](#-part-1---lambda-serverless-api-cloudformation)
+- [Part 2, Lambda Power Tuning](#-part-2---lambda-power-tuning)
+- [Part 3, ECS Fargate API (CloudFormation)](#-part-3---ecs-fargate-api-cloudformation)
+- [Part 4, Performance Testing with Postman](#-part-4---performance-testing-with-postman)
+- [Part 5, Cost Comparison](#-part-5---cost-comparison)
 - [Results & Verdict](#-results--verdict)
 - [Limitations & Fair Comparison Notes](#️-limitations--fair-comparison-notes)
 - [Cleanup](#-cleanup)
@@ -52,7 +52,7 @@ serverless-showdown/
 
 ## 🎯 Why This Project?
 
-Choosing betIen serverless and containers is one of the most common decisions cloud engineers face. Rather than relying on theory, this project builds **both architectures from scratch**, optimizes the Lambda side with **AWS Lambda Power Tuning**, hits them both with **identical Postman load tests**, and compares them on **latency, throughput, and cost**.
+Choosing between serverless and containers is one of the most common decisions cloud engineers face. Rather than relying on theory, this project builds **both architectures from scratch**, optimizes the Lambda side with **AWS Lambda Power Tuning**, hits them both with **identical Postman load tests**, and compares them on **latency, throughput, and cost**.
 
 **Everything is provisioned via CloudFormation**, just deploy the stacks and you're ready to test. No clicking around the console. No manual resource wiring.
 
@@ -96,7 +96,7 @@ Both paths expose the same CRUD operations, `create`, `read`, `update`, `delete`
 
 ---
 
-## 🔶 Part 1, Lambda Serverless API (CloudFormation)
+## 🔶 Part 1 - Lambda Serverless API (CloudFormation)
 
 This single CloudFormation template provisions the **entire Lambda stack**: DynamoDB table, IAM role with least-privilege policy, Lambda function, API Gateway HTTP API with a `POST /DynamoDBManager` route, and an auto-deployed `$default` stage.
 
@@ -177,7 +177,7 @@ Take a moment to review what was deployed, understanding each resource is key:
 
 ---
 
-## ⚡ Part 2, Lambda Power Tuning
+## ⚡ Part 2 - Lambda Power Tuning
 
 This is where things get interesting. AWS Lambda Power Tuning is an open-source Step Functions state machine that runs your function at **multiple memory configurations** and tells you the **optimal setting for cost, speed, or a balance of both**.
 
@@ -252,7 +252,7 @@ aws lambda update-function-configuration \
 ```
 ---
 
-## 🐳 Part 3, ECS Fargate API (CloudFormation)
+## 🐳 Part 3 - ECS Fargate API (CloudFormation)
 
 Now I build the same API as a containerized Flask app on ECS Fargate. I'll first build and push the Docker image, then deploy the full infrastructure via CloudFormation.
 
@@ -373,7 +373,7 @@ curl -X POST http://<ALB_DNS_NAME>/DynamoDBManager \
 
 ---
 
-## 🧪 Part 4, Performance Testing with Postman
+## 🧪 Part 4 - Performance Testing with Postman
 
 Now the fun part: head-to-head performance testing.
 
@@ -437,13 +437,13 @@ Here's what I measured with **100 virtual users over 5 minutes** using Peak load
 
 > 🔍 **Key Observations:**
 > - **ECS wins on throughput**, 14% more total requests handled (65,957 vs 57,963) thanks to being always-warm with no cold start overhead.
-> - **Lambda wins on tail latency**, surprisingly, Lambda's P90/P95/P99 Ire *tighter* than ECS (295ms vs 362ms at P95). Lambda's execution was more consistent once warm.
+> - **Lambda wins on tail latency**, surprisingly, Lambda's P90/P95/P99 were *tighter* than ECS (295ms vs 362ms at P95). Lambda's execution was more consistent once warm.
 > - **Lambda's max spike tells the cold start story**, the 3,701ms max vs ECS's 1,138ms max shows the cold start penalty during the ramp-up phase when new Lambda instances spin up.
 > - **Average latency was nearly identical**, 264ms (Lambda) vs 250ms (ECS). At steady state, the compute difference is marginal; DynamoDB call latency dominates.
 
 ### 4.4 Cold Start Deep Dive
 
-Lambda cold starts shoId up clearly in the max response time, **3,701ms** vs ECS's 1,138ms. This happens during the ramp-up phase of the Peak load profile when Postman scales from 0 to 100 VU and Lambda spins up new execution environments.
+Lambda cold starts showed up clearly in the max response time, **3,701ms** vs ECS's 1,138ms. This happens during the ramp-up phase of the Peak load profile when Postman scales from 0 to 100 VU and Lambda spins up new execution environments.
 
 | Cold Start Evidence | Lambda | ECS |
 |---|:---:|:---:|
@@ -457,7 +457,7 @@ With **Provisioned Concurrency** (not used here), cold starts drop to near zero,
 
 ---
 
-## 💰 Part 5, Cost Comparison
+## 💰 Part 5 - Cost Comparison
 
 This is where the decision gets real. I compare costs at **three traffic levels**.
 
@@ -605,7 +605,7 @@ The beauty of CloudFormation, tear down everything with three commands. No hunti
 
 1. **Always Tune**, I went from ~2,850ms at 128MB to ~250ms at 1024MB, an **11× latency improvement** while cost barely moved. At 1024MB you get the best balance of speed and cost, beyond that, you're paying significantly more for diminishing returns.
 
-2. **Lambda isn't always cheaper**, At 1024MB memory, Lambda's per-request cost is ~$0.0000047. ECS with NAT breaks even around 20M requests/month. If you use 512MB (best cost from Powerr Tuning), the crossover shifts to ~50M+ requests.
+2. **Lambda isn't always cheaper**, At 1024MB memory, Lambda's per-request cost is ~$0.0000047. ECS with NAT breaks even around 20M requests/month. If you use 512MB (best cost from Power Tuning), the crossover shifts to ~50M+ requests.
 
 3. **Cold starts are real but narrow**, Our max Lambda response was 3,701ms vs an average of 264ms. That ~3.4 second penalty only hits during ramp-up, once warm, Lambda's P90 (285ms) actually beat ECS's P90 (333ms).
 
